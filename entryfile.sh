@@ -69,7 +69,6 @@ fi
                 "${mysql[@]}" <<-EOSQL
                         -- What's done in this file shouldn't be replicated
                         --  or products like mysql-fabric won't work
-                        INSTALL PLUGIN group_replication SONAME 'group_replication.so';
                         SET @@SESSION.SQL_LOG_BIN=0;
                         CREATE USER 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' ;
                         GRANT ALL ON *.* TO 'root'@'%' WITH GRANT OPTION ;
@@ -81,9 +80,14 @@ fi
                         CHANGE MASTER TO MASTER_USER='rpl_user', MASTER_PASSWORD='rpl_pass' FOR CHANNEL 'group_replication_recovery';
                         FLUSH PRIVILEGES ;
                 EOSQL
+
+
                 if [ ! -z "$MYSQL_ROOT_PASSWORD" ]; then
                         mysql+=( -p"${MYSQL_ROOT_PASSWORD}" )
                 fi
+
+                echo "RESET MASTER ;" | "${mysql[@]}"
+                echo "INSTALL PLUGIN group_replication SONAME 'group_replication.so';" | "${mysql[@]}"
 
                 if [ "$MYSQL_DATABASE" ]; then
                         echo "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\` ;" | "${mysql[@]}"
@@ -101,9 +105,7 @@ fi
                 fi
 
                 if [ ! -z "$MYSQL_ONETIME_PASSWORD" ]; then
-                        "${mysql[@]}" <<-EOSQL
-                                ALTER USER 'root'@'%' PASSWORD EXPIRE;
-                        EOSQL
+                        echo 'ALTER USER 'root'@'%' PASSWORD EXPIRE;' | "${mysql[@]}"
                 fi
                 if ! kill -s TERM "$pid" || ! wait "$pid"; then
                         echo >&2 'MySQL init process failed.'
